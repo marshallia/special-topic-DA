@@ -19,7 +19,7 @@ BATCH_SIZE = 32
 NUM_EPOCHS = 20
 LEARNING_RATE = 1e-3
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-MODEL_SAVE_PATH = 'cdan_resnet18.pth'
+MODEL_SAVE_PATH = 'model/cdan_resnet18.pth'
 
 # --------------------------
 # Data Transforms

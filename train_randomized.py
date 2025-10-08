@@ -17,7 +17,7 @@ NUM_EPOCHS = 20
 LEARNING_RATE = 1e-3
 NUM_CLASSES = len(os.listdir(DATA_DIR))
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-MODEL_SAVE_PATH = 'baseline_randomized_resnet18.pth'
+MODEL_SAVE_PATH = 'model/baseline_randomized_resnet18.pth'
 
 # --------------------------
 # Data Transforms with Randomization
