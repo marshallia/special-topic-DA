@@ -6,26 +6,31 @@ import torch.optim as optim
 from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
 import copy
-
+from tqdm import tqdm
 # --------------------------
 # Configuration
 # --------------------------
-DATA_DIR = 'data/sim/train'
-VAL_DIR = 'data/sim/val'
+DATA_DIR = 'data/train'
+VAL_DIR = 'data/validation'
 BATCH_SIZE = 32
 NUM_EPOCHS = 20
 LEARNING_RATE = 1e-3
 NUM_CLASSES = len(os.listdir(DATA_DIR))
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-MODEL_SAVE_PATH = 'model/baseline_randomized_resnet18.pth'
+MODEL_SAVE_PATH = 'model/baseline_randomized_resnet50.pth'
+print(DEVICE)
 
+train_losses =[]
+train_accuracies = []
+val_losses =[]
+val_accuracies = []
 # --------------------------
 # Data Transforms with Randomization
 # --------------------------
 train_transform = transforms.Compose([
     transforms.Resize((224,224)),
     transforms.RandomHorizontalFlip(),
-    transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
+    transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1), # random brighness, contrastm saturation, and hue
     transforms.RandomRotation(15),
     transforms.RandomAffine(degrees=0, translate=(0.1,0.1)),
     transforms.ToTensor(),
@@ -52,7 +57,7 @@ print(f"Training samples: {len(train_dataset)} | Validation samples: {len(val_da
 # --------------------------
 # Model
 # --------------------------
-model = models.resnet18(pretrained=True)
+model = models.resnet50(pretrained=True)
 model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
 model = model.to(DEVICE)
 
@@ -70,13 +75,12 @@ best_model_wts = copy.deepcopy(model.state_dict())
 
 for epoch in range(1, NUM_EPOCHS+1):
     print(f"\nEpoch {epoch}/{NUM_EPOCHS}")
-    print('-'*20)
-    
     # Training
     model.train()
     running_loss = 0.0
     running_corrects = 0
-    for inputs, labels in train_loader:
+    progress_bar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{NUM_EPOCHS}")
+    for inputs, labels in progress_bar:
         inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
         optimizer.zero_grad()
         outputs = model(inputs)
@@ -114,5 +118,37 @@ for epoch in range(1, NUM_EPOCHS+1):
         best_model_wts = copy.deepcopy(model.state_dict())
         torch.save(model.state_dict(), MODEL_SAVE_PATH)
         print(f"Saved best model with Val Acc: {best_acc:.4f}")
+    train_losses.append(epoch_loss)
+    train_accuracies.append(epoch_acc)
+
+    val_losses.append(val_loss)
+    val_accuracies.append(val_acc)
 
 print(f"\nTraining complete. Best Val Acc: {best_acc:.4f}")
+
+# Visualization
+epochs = range(1, NUM_EPOCHS + 1)
+plt.figure(figsize=(12,5))
+
+# Loss subplot
+plt.subplot(1,2,1)
+plt.plot(epochs, train_losses, 'b-', label='Training Loss')
+plt.plot(epochs, val_losses, 'orange', label='Validation Loss')
+plt.title('Loss vs. Epoch')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend()
+plt.grid(True)
+
+# Accuracy subplot
+plt.subplot(1,2,2)
+plt.plot(epochs, train_accuracies, 'g-', label='Training Accuracy')
+plt.plot(epochs, val_accuracies, 'r-', label='Validation Accuracy')
+plt.title('Accuracy vs. Epoch')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.grid(True)
+
+plt.tight_layout()
+plt.show()

@@ -7,18 +7,20 @@ import torch.optim as optim
 from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
 import copy
+from tqdm import tqdm
 
 # --------------------------
 # Configuration
 # --------------------------
-DATA_DIR = 'data/sim/train'       # Path to simulated training data
-VAL_DIR = 'data/sim/val'          # Path to simulated validation data
+DATA_DIR = 'data/train'       # Path to simulated training data
+VAL_DIR = 'data/validation'          # Path to simulated validation data
 BATCH_SIZE = 32
 NUM_EPOCHS = 20
 LEARNING_RATE = 1e-3
 NUM_CLASSES = len(os.listdir(DATA_DIR))
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-MODEL_SAVE_PATH = 'model/baseline_resnet18.pth'
+print(DEVICE)
+MODEL_SAVE_PATH = 'model/baseline_resnet50.pth'
 
 # --------------------------
 # Data Transforms
@@ -53,7 +55,7 @@ print(f"Number of validation samples: {len(val_dataset)}")
 # --------------------------
 # Model
 # --------------------------
-model = models.resnet18(pretrained=True)
+model = models.resnet50(pretrained=True)
 model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
 model = model.to(DEVICE)
 
@@ -68,17 +70,18 @@ optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # --------------------------
 best_model_wts = copy.deepcopy(model.state_dict())
 best_acc = 0.0
-
-for epoch in range(1, NUM_EPOCHS + 1):
-    print(f"\nEpoch {epoch}/{NUM_EPOCHS}")
-    print('-' * 20)
-    
+train_losses =[]
+train_accuracies = []
+val_losses =[]
+val_accuracies = []
+for epoch in range(0, NUM_EPOCHS):
     # Training
     model.train()
     running_loss = 0.0
     running_corrects = 0
-    
-    for inputs, labels in train_loader:
+    batch_number = 0
+    progress_bar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{NUM_EPOCHS}")
+    for inputs, labels in progress_bar:
         inputs = inputs.to(DEVICE)
         labels = labels.to(DEVICE)
         
@@ -91,7 +94,7 @@ for epoch in range(1, NUM_EPOCHS + 1):
         _, preds = torch.max(outputs, 1)
         running_loss += loss.item() * inputs.size(0)
         running_corrects += torch.sum(preds == labels.data)
-    
+        batch_number += 1
     epoch_loss = running_loss / len(train_dataset)
     epoch_acc = running_corrects.double() / len(train_dataset)
     print(f"Train Loss: {epoch_loss:.4f} | Train Acc: {epoch_acc:.4f}")
@@ -122,5 +125,37 @@ for epoch in range(1, NUM_EPOCHS + 1):
         best_model_wts = copy.deepcopy(model.state_dict())
         torch.save(model.state_dict(), MODEL_SAVE_PATH)
         print(f"Best model saved with Val Acc: {best_acc:.4f}")
+    train_losses.append(epoch_loss)
+    train_accuracies.append(epoch_acc)
+
+    val_losses.append(val_loss)
+    val_accuracies.append(val_acc)
 
 print(f"\nTraining complete. Best Val Acc: {best_acc:.4f}")
+
+# Visualization
+epochs = range(1, NUM_EPOCHS + 1)
+plt.figure(figsize=(12,5))
+
+# Loss subplot
+plt.subplot(1,2,1)
+plt.plot(epochs, train_losses, 'b-', label='Training Loss')
+plt.plot(epochs, val_losses, 'orange', label='Validation Loss')
+plt.title('Loss vs. Epoch')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend()
+plt.grid(True)
+
+# Accuracy subplot
+plt.subplot(1,2,2)
+plt.plot(epochs, train_accuracies, 'g-', label='Training Accuracy')
+plt.plot(epochs, val_accuracies, 'r-', label='Validation Accuracy')
+plt.title('Accuracy vs. Epoch')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.grid(True)
+
+plt.tight_layout()
+plt.show()
